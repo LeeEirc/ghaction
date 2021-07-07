@@ -31,8 +31,8 @@ func init() {
 }
 
 func main() {
+	pflag.Parse()
 	globalConfig = LoadConfig()
-
 	owner, repo, err := ghaction.ParseRepoURL(globalConfig.RepoURL)
 	if err != nil {
 		log.Fatal(err)
@@ -83,7 +83,6 @@ func LoadEnvConfig() Config {
 }
 
 func LoadConfig() Config {
-	pflag.Parse()
 	viper.AutomaticEnv()
 	conf := LoadEnvConfig()
 	err := viper.BindPFlags(pflag.CommandLine)
