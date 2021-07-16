@@ -69,8 +69,12 @@ func (r *Repository) UploadAssetToRelease(ctx context.Context, gitRelease *githu
 		return err
 	}
 	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return err
+	}
 	opt := github.UploadOptions{
-		Name:      f.Name(),
+		Name: info.Name(),
 	}
 	_, _, err = r.Client.Repositories.UploadReleaseAsset(ctx, r.Owner, r.Name, gitRelease.GetID(), &opt, f)
 	return err
