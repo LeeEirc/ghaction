@@ -14,7 +14,7 @@ type Repository struct {
 	Client *github.Client
 }
 
-func (r *Repository) GetBranch(ctx context.Context, branch string, ) (*github.Branch, error) {
+func (r *Repository) GetBranch(ctx context.Context, branch string) (*github.Branch, error) {
 	gitBranch, _, err := r.Client.Repositories.GetBranch(ctx, r.Owner, r.Name, branch)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,17 @@ func (r *Repository) createRefFromBranch(ctx context.Context, branch string, ref
 	return err
 }
 
-func (r *Repository) CreateRelease(ctx context.Context, tagName string, branch string, ) (*github.RepositoryRelease, error) {
+func (r *Repository) CreateRelease(ctx context.Context, tagName string, branch string) (*github.RepositoryRelease, error) {
+	allRelease, err := r.ListAllReleases(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range allRelease {
+		release := allRelease[i]
+		if release.GetTagName() == tagName {
+			return release, nil
+		}
+	}
 	gitRelease := github.RepositoryRelease{
 		TagName:         github.String(tagName),
 		TargetCommitish: github.String(branch),
@@ -78,4 +88,49 @@ func (r *Repository) UploadAssetToRelease(ctx context.Context, gitRelease *githu
 	}
 	_, _, err = r.Client.Repositories.UploadReleaseAsset(ctx, r.Owner, r.Name, gitRelease.GetID(), &opt, f)
 	return err
+}
+
+func (r *Repository) ListReleases(ctx context.Context) ([]*github.RepositoryRelease, error) {
+	listOpt := github.ListOptions{
+		Page:    0,
+		PerPage: 0,
+	}
+	resGitRelease, _, err := r.Client.Repositories.ListReleases(ctx, r.Owner, r.Name, &listOpt)
+	if err != nil {
+		return nil, err
+	}
+	return resGitRelease, nil
+}
+
+func (r *Repository) ListMatchDraftReleases(ctx context.Context) ([]*github.RepositoryRelease, error) {
+	listOpt := github.ListOptions{}
+	resGitRelease, _, err := r.Client.Repositories.ListReleases(ctx, r.Owner, r.Name, &listOpt)
+	if err != nil {
+		return nil, err
+	}
+	var drafts []*github.RepositoryRelease
+	for i := range resGitRelease {
+		release := resGitRelease[i]
+		if release.GetDraft() {
+			drafts = append(drafts, release)
+		}
+	}
+	return drafts, nil
+}
+
+func (r *Repository) ListAllReleases(ctx context.Context) ([]*github.RepositoryRelease, error) {
+	listOpt := github.ListOptions{}
+	ret := make([]*github.RepositoryRelease, 0, 30)
+	for {
+		resGitRelease, resp, err := r.Client.Repositories.ListReleases(ctx, r.Owner, r.Name, &listOpt)
+		if err != nil {
+			return nil, err
+		}
+		ret = append(ret, resGitRelease...)
+		if resp.NextPage == 0 {
+			break
+		}
+		listOpt.Page = resp.NextPage
+	}
+	return ret, nil
 }
